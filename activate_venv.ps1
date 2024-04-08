@@ -1,1 +1,0 @@
-.\discordchatbot_env\Scripts\Activate.ps1
