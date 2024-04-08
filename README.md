@@ -24,8 +24,8 @@ DiscordBot/
 ## 主要檔案說明
 
 - `bot_main.py`: 專案的主程式,負責初始化和啟動Discord機器人。
-- `channel_setup_config.json`: 儲存Cog應用頻道的設定文件。
-- `cog_mapping_config.json`: 儲存Cog對應中文名稱的設定文件。
+- `channel_setup_config.json`: 儲存Cog應用頻道的設定文件。（自己把.example拿掉）
+- `cog_mapping_config.json`: 儲存Cog對應中文名稱的設定文件。（自己把.example拿掉）
 
 ## Cogs說明
 
