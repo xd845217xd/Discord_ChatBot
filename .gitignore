@@ -120,6 +120,7 @@ ENV/
 env.bak/
 venv.bak/
 discordchatbot_env/
+activate_venv.ps1
 
 # Spyder project settings
 .spyderproject
