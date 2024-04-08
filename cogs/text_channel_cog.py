@@ -8,11 +8,11 @@ class TextChannelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.client = OpenAI(api_key=os.getenv('OPENAI_TOKEN'))  # 初始化OpenAI客戶端
-        self.chat_history = {}  # 用來儲存聊天歷史的字典
-        self.channel_config = self.load_channel_config()  # 載入頻道配置
+        self.chat_history = {}  # 用來儲存聊天歷史紀錄
+        self.channel_config = self.load_channel_config()  # 載入頻道設定
 
     def load_channel_config(self):
-        # 從文件中讀取頻道配置
+        # 從文件中讀取頻道設定
         with open('channel_setup_config.json', 'r') as file:
             return json.load(file)
 
@@ -42,7 +42,7 @@ class TextChannelCog(commands.Cog):
 
             user_history = self.chat_history[channel_id][user_id]
 
-            # 將新消息添加到對話歷史中，即使不立即回應
+            # 將新訊息添加到對話歷史中，即使不立即回應
             user_history["messages"].append({"role": "user", "content": message.content})
 
             # 為了保持對話連貫性，使用較長的對話歷史來生成回應
@@ -60,7 +60,7 @@ class TextChannelCog(commands.Cog):
                 return
             user_history["last_processed_message_id"] = message.id
 
-            # 調用OpenAI API來獲取機器人回應
+            # 調用OpenAI API來獲取機器人回話
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages_for_api,
@@ -70,11 +70,10 @@ class TextChannelCog(commands.Cog):
 
             bot_reply = response.choices[0].message.content
 
-            # 發送機器人的回應
+            # 發送機器人的回話
             mention = message.author.mention
             await message.channel.send(f"{mention} {bot_reply}")
 
 async def setup(bot):
     text_channel_cog = TextChannelCog(bot)  # 創建對話管理器實例
     await bot.add_cog(text_channel_cog)  # 將實例加入機器人
-    print("Text Channel Cog loaded.")

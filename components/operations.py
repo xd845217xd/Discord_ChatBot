@@ -90,7 +90,7 @@ class ClearChannelOperation(Operation):
         else:
             await self.interaction.followup.send("此頻道不是任何 Cog 的特定頻道。", ephemeral=True)
 
-# 將所有操作類組織到一個字典中，便於根據名稱查找和執行
+# 將所有操作類組織到一個字典中，便於根據名稱查詢和執行
 OPERATIONS = {
     'load': LoadOperation,
     'unload': UnloadOperation,

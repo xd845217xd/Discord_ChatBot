@@ -42,4 +42,3 @@ class ChannelSetupCog(commands.Cog):
 async def setup(bot):
     channel_setup_cog = ChannelSetupCog(bot)
     await bot.add_cog(channel_setup_cog)  # 將這個 cog 添加到 bot 中
-    print("Channel Setup Cog loaded.")

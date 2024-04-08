@@ -10,7 +10,7 @@ from components.cog_select_view import CogSelectView
 from components.clear_confirm_view import ClearConfirmView
 from dotenv import load_dotenv
 
-# Load the environment variables from the .env file
+# 從 .env 檔案載入環境設定檔，token那類的
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(name)s: %(message)s')

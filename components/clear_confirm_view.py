@@ -3,7 +3,7 @@ from .operations import ClearChannelOperation
 
 class ClearConfirmView(discord.ui.View):
     def __init__(self, bot, interaction, channel):
-        super().__init__(timeout=30)  # 設置超時時間為 30 秒
+        super().__init__(timeout=30)  # 設定超時時間為 30 秒
         self.bot = bot
         self.interaction = interaction
         self.channel = channel
