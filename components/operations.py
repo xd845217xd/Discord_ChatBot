@@ -34,7 +34,7 @@ class ReloadOperation(Operation):
 class ConfigureSetupOperation(Operation):
     async def execute(self, cog_name):
         guild_id = str(self.interaction.guild_id)
-        if cog_name not in ['monopoly_cog', 'text_channel_cog']:  # 假設 message_cog 和 text_channel_cog 是可配置的 cog
+        if cog_name not in ['openrouter_chat_cog', 'text_channel_cog']:  # 假設 openrouter_chat_cog 和 text_channel_cog 是可配置的 cog
             await self.interaction.response.send_message("不支援的 cog 名稱。", ephemeral=True)
             return
 
@@ -45,6 +45,10 @@ class ConfigureSetupOperation(Operation):
         self.bot.config[guild_id][cog_name] = str(self.channel.id)
         self.bot.save_config()  # 確保有實現這個方法
         await self.interaction.response.send_message(f"已將 {self.channel.name} 設置為 {cog_name} 的特定頻道。", ephemeral=True)
+        
+        # 重新載入對應的 Cog
+        await self.bot.reload_extension(f"cogs.{cog_name}")
+        await self.interaction.followup.send(f"`{cog_name}` 模組已重新載入。", ephemeral=True)
 
 # 移除特定頻道
 class RemoveSetupOperation(Operation):
@@ -54,6 +58,10 @@ class RemoveSetupOperation(Operation):
             del self.bot.config[guild_id]
             self.bot.save_config()  # 確保有實現這個方法
             await self.interaction.response.send_message("已移除特定頻道設定。", ephemeral=True)
+
+            # 重新載入對應的 Cog
+            await self.bot.reload_extension(f"cogs.{cog_name}")
+            await self.interaction.followup.send(f"`{cog_name}` 模組已重新載入。", ephemeral=True)
         else:
             await self.interaction.response.send_message("此伺服器尚未設置特定頻道。", ephemeral=True)
 
