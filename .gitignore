@@ -154,3 +154,4 @@ cython_debug/
 #.idea/
 channel_setup_config.json
 cog_mapping_config.json
+api_select_config.json

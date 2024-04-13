@@ -8,36 +8,52 @@ Python跟Discord.py，可以讓用戶在discord上跟大型語言模組尬聊的
 DiscordBot/
 │
 ├── bot_main.py
-├── channel_setup_config.json
-├── cog_mapping_config.json
+├── configs/
+│   ├── api_select_config.json
+│   ├── channel_setup_config.json
+│   └── cog_mapping_config.json
 │
 ├── cogs/
 │   ├── channel_setup_cog.py
 │   ├── message_cog.py
 │   └── text_channel_cog.py
-│ 
-└── components/
-    ├── cog_select_view.py
-    └── operations.py
+│
+├── components/
+│   ├── api_select_view.py
+│   ├── clear_confirm_view.py
+│   ├── cog_select_view.py
+│   └── operations.py
+│
+└── llms/
+    ├── claude3haiku_chat_cog.py
+    └── openai_chat_cog.py
 ```
 
 ## 主要檔案說明
 
 - `bot_main.py`: 專案的主程式,負責初始化和啟動Discord機器人。
-- `channel_setup_config.json`: 儲存Cog應用頻道的設定文件。（自己把.example拿掉）
-- `cog_mapping_config.json`: 儲存Cog對應中文名稱的設定文件。（自己把.example拿掉）
+- `configs/`: 存放各種設定文件。
+  - `api_select_config.json`: 儲存選擇的 API 的設定。
+  - `channel_setup_config.json`: 儲存 Cog 應用頻道的設定。
+  - `cog_mapping_config.json`: 儲存 Cog 對應中文名稱的設定。
 
-## Cogs說明
+## Cogs 說明
 
-- `channel_setup_cog.py`: 負責設定Cog對應頻道。
-- `message_cog.py`: 可以使用"/chat"呼叫對話框，與OpenAI API對話。
-- `text_channel_cog.py`: 負責在文字頻道上，透過OpenAI API處理一般對話的功能。
+- `channel_setup_cog.py`: 負責設定 Cog 對應頻道。
+- `message_cog.py`: 可以使用 "/chat" 呼叫對話框,與 OpenAI API 對話。
+- `text_channel_cog.py`: 負責在文字頻道上,透過選擇的 API 處理一般對話的功能。
 
-## Components說明
+## Components 說明
 
-- `clear_confirm_view.py`: 實現清空指定頻道所有訊息的discord互動介面。
-- `cog_select_view.py`: 實現幫cog選擇指定使用頻道的discord互動介面。
-- `operations.py`: bot_main.py裡面斜線指令對應的程式邏輯都在這裡。
+- `api_select_view.py`: 實現選擇 API 的 Discord 互動介面。
+- `clear_confirm_view.py`: 實現清空指定頻道所有訊息的 Discord 互動介面。
+- `cog_select_view.py`: 實現幫 Cog 選擇指定使用頻道的 Discord 互動介面。
+- `operations.py`: bot_main.py 裡面斜線指令對應的程式邏輯都在這裡。
+
+## LLMs 說明
+
+- `claude3haiku_chat_cog.py`: 負責透過 OpenRouter API 處理一般對話的功能。目前是固定在 claude 3 的 haiku 模型。
+- `openai_chat_cog.py`: 負責透過 OpenAI API 處理一般對話的功能。
 
 ## 如何運行
 

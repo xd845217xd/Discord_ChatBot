@@ -8,6 +8,7 @@ from discord.ext import commands
 from discord import app_commands
 from components.cog_select_view import CogSelectView
 from components.clear_confirm_view import ClearConfirmView
+from components.api_select_view import APISelectView
 from dotenv import load_dotenv
 
 # 從 .env 檔案載入環境設定檔，token那類的
@@ -22,19 +23,41 @@ discord_token = os.getenv('DISCORD_TOKEN')
 class Bot(commands.Bot):
     def __init__(self, command_prefix, intents):
         super().__init__(command_prefix, intents=intents)
-        self.config = self.load_config('channel_setup_config.json')
-        self.cogs_mapping = self.load_config('cog_mapping_config.json').get('cogs_mapping', {})
+        self.config_paths = {
+            'channel': 'configs/channel_setup_config.json',
+            'api': 'configs/api_select_config.json',
+            'cogs_config': 'configs/cog_mapping_config.json'
+        }
+        self.config_defaults = {
+            'channel': {},
+            'api': {},
+            'cogs_config': {"cogs_mapping": {}}
+        }
+        self.load_all_configs()
 
-    def load_config(self, config_file):
+    def load_all_configs(self):
+        for config_key, file_path in self.config_paths.items():
+            try:
+                if not os.path.exists(file_path):
+                    self.create_config(file_path, self.config_defaults[config_key])
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    setattr(self, config_key, json.load(f))
+            except IOError as e:
+                print(f"Error loading {file_path}: {str(e)}")
+
+    def create_config(self, file_path, default_config):
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return {}  # 如果配置檔案不存在，則建立一個空的配置檔案
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, indent=4)
+        except IOError as e:
+            print(f"Error creating {file_path}: {str(e)}")
 
-    def save_config(self):
-        with open('channel_setup_config.json', 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, indent=4)  # 保存配置到檔案當中
+    def save_config(self, config, file_path):
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4)
+        except IOError as e:
+            print(f"Error saving {file_path}: {str(e)}")
 
     async def setup_hook(self):
         # 加載 cogs 或其他啟動設定
@@ -52,6 +75,7 @@ async def on_ready():
     await bot.tree.sync()
     print(f'{bot.user.name} 已經連接到 Discord!', flush=True)
     print("已載入的模組:", bot.extensions.keys(), flush=True)
+    print("已加載的 Cog:", [cog_name for cog_name in bot.cogs], flush=True)
 
 # 定義斜線指令
 @bot.tree.command(name="load", description="載入模組")
@@ -95,19 +119,25 @@ async def show_mapping(interaction: discord.Interaction):
     await interaction.response.defer()
 
     # 生成映射表的字符串表示
-    mapping = "\n".join(f"{key}: {value}" for key, value in interaction.client.cogs_mapping.items())
+    mapping = "\n".join(f"{key}: {value}" for key, value in interaction.client.cogs_config['cogs_mapping'].items())
     
     # 發送最終回應
     await interaction.followup.send(f"目前的 cog 映射表：\n{mapping}")
 
-# 自動載入 cogs 目錄下的所有擴展
-async def load_extensions():
-    for filename in os.listdir("./cogs"):
+@bot.tree.command(name="select_api", description="選擇要使用的 API")
+async def select_api(interaction: discord.Interaction):
+    view = APISelectView()
+    await interaction.response.send_message("請選擇要使用的 API:", view=view, ephemeral=True)
+
+# 自動載入 cogs跟llms 目錄下的所有擴展
+async def load_extensions(directory):
+    for filename in os.listdir(f"./{directory}"):
         if filename.endswith(".py"):
-            await bot.load_extension(f"cogs.{filename[:-3]}")
+            await bot.load_extension(f"{directory}.{filename[:-3]}")
 
 async def main():
-    await load_extensions()
+    await load_extensions("cogs")
+    await load_extensions("llms")
     await bot.start(discord_token)
 
 if __name__ == '__main__':

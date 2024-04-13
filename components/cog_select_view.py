@@ -1,5 +1,3 @@
-# 文件路徑: components/cog_select_view.py
-
 import discord
 from .operations import OPERATIONS
 
@@ -16,7 +14,7 @@ class CogSelect(discord.ui.Select):
         self.title = title
         options = [
             discord.SelectOption(label=name, value=cog)
-            for cog, name in bot.cogs_mapping.items()
+            for cog, name in bot.cogs_config['cogs_mapping'].items()
         ]
         super().__init__(placeholder="請選擇一個模組...", min_values=1, max_values=1, options=options)
         self.channel = channel
