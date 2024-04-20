@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from openai import OpenAI
 import os
 import json
 
@@ -10,27 +9,33 @@ class TextChannelCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        # 判斷是否為私人訊息或由機器人本身發出的訊息
         if message.guild is None or message.author == self.bot.user:
             return
 
         guild_id = str(message.guild.id)
-        channel_id = message.channel.id
+        channel_id = str(message.channel.id)
 
-        if (guild_id in self.bot.channel and
-                channel_id == int(self.bot.channel[guild_id]) and
-                self.bot.user.mentioned_in(message)):
-            api_cog_name = self.bot.api.get(guild_id)
-            if api_cog_name:
-                print(f"正在嘗試獲取 Cog: {api_cog_name}")
-                api_cog = self.bot.get_cog(api_cog_name)
-                if api_cog:
-                    print(f"成功獲取 Cog: {api_cog_name}")
-                    await api_cog.process_message(message)
-                else:
-                    print(f"無法獲取 Cog: {api_cog_name}")
-                    await message.channel.send(f"{api_cog_name} 尚未加載。")
+        # 同時檢查訊息是否提及機器人以及頻道是否配置於設定中
+        if self.bot.user in message.mentions and guild_id in self.bot.channel and channel_id in self.bot.channel[guild_id]:
+            channel_config = self.bot.channel[guild_id][channel_id]
+            cog_name = channel_config['cog']
+            api = channel_config['api']
+            module = channel_config['module']
+            prompt_name = channel_config['prompt']
+
+            # 根據提示詞的名稱獲取對應的內容
+            prompt_content = next((prompt['content'] for prompt in self.bot.prompt['prompts'] if prompt['name'] == prompt_name), self.bot.prompt['default'])
+
+            # 獲取指定名稱的 cog
+            api_cog = self.bot.get_cog(cog_name)
+            if api_cog:
+                # 如果 cog 存在,則呼叫該 cog 的 process_message 方法處理訊息
+                await api_cog.process_message(message, api, module, prompt_content)
             else:
-                await message.channel.send("請先選擇一個 API 進行對話。")
+                await message.channel.send(f"{cog_name} 尚未加載。")
+        else:
+            return  # 如果條件不符,則不執行任何操作
 
 async def setup(bot):
     await bot.add_cog(TextChannelCog(bot))

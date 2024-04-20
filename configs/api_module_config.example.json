@@ -1,0 +1,45 @@
+{
+    "openrouter": {
+        "cog_name": "OpenRouterChatCog",
+        "modules": [
+            {
+                "name": "Haiku",
+                "value": "anthropic/claude-3-haiku:beta"
+            },
+            {
+                "name": "Sonnet",
+                "value": "anthropic/claude-3-sonnet:beta"
+            },
+            {
+                "name": "Google Gemma 7B",
+                "value": "google/gemma-7b-it:free"
+            }
+        ]
+    },
+    "openai": {
+        "cog_name": "OpenAIChatCog",
+        "modules": [
+            {
+                "name": "GPT-3.5 Turbo",
+                "value": "gpt-3.5-turbo"
+            },
+            {
+                "name": "GPT-4 Turbo with Vision",
+                "value": "gpt-4-turbo"
+            }
+        ]
+    },
+    "cohere": {
+        "cog_name": "CohereChatCog",
+        "modules": [
+            {
+                "name": "Command R",
+                "value": "command-r"
+            },
+            {
+                "name": "Command R Plus",
+                "value": "command-r-plus"
+            }
+        ]
+    }
+}

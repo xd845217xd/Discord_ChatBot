@@ -1,13 +1,16 @@
 import discord
 from discord.ext import commands
-from openai import OpenAI
 import os
+import datetime
+from openai import OpenAI
 
-class OpenAIChatCog(commands.Cog):
+class OpenRouterChatCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.client = OpenAI(api_key=os.getenv('OPENAI_TOKEN'))
+        self.api_key = os.getenv('OPENROUTER_API_KEY')
+        self.base_url = 'https://openrouter.ai/api/v1'
         self.chat_history = {}
+        self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
 
     async def process_message(self, message, api, module, prompt):
         user_id = str(message.author.id)
@@ -25,6 +28,7 @@ class OpenAIChatCog(commands.Cog):
         user_history = self.chat_history[channel_id][user_id]
         user_history["messages"].append({"role": "user", "content": message.content})
         messages_for_api = user_history["messages"][-5:]
+
         messages_for_api.append({"role": "system", "content": prompt})
 
         if message.id == user_history["last_processed_message_id"]:
@@ -44,4 +48,4 @@ class OpenAIChatCog(commands.Cog):
         await message.reply(f"{mention} {bot_reply}")
 
 async def setup(bot):
-    await bot.add_cog(OpenAIChatCog(bot))  # 將 Cog 添加到 bot 中
+    await bot.add_cog(OpenRouterChatCog(bot)) # 將 Cog 添加到 bot 中

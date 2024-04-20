@@ -25,7 +25,7 @@ DiscordBot/
 │   └── operations.py
 │
 └── llms/
-    ├── claude3haiku_chat_cog.py
+    ├── openrouter_chat_cog.py.py
     └── openai_chat_cog.py
 ```
 
@@ -52,8 +52,9 @@ DiscordBot/
 
 ## LLMs 說明
 
-- `claude3haiku_chat_cog.py`: 負責透過 OpenRouter API 處理一般對話的功能。目前是固定在 claude 3 的 haiku 模型。
+- `openrouter_chat_cog.py`: 負責透過 OpenRouter API 處理一般對話的功能。
 - `openai_chat_cog.py`: 負責透過 OpenAI API 處理一般對話的功能。
+- `cohere_chat_cog.py`: 負責透過 Cohere API 處理一般對話的功能。
 
 ## 如何運行
 

@@ -155,3 +155,5 @@ cython_debug/
 channel_setup_config.json
 cog_mapping_config.json
 api_select_config.json
+prompt_config.json
+api_module_config.json

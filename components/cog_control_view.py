@@ -1,12 +1,13 @@
 import discord
 from .operations import OPERATIONS
 
-class CogSelectView(discord.ui.View):
-    def __init__(self, bot, title, channel=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class CogControlView(discord.ui.View):
+    def __init__(self, bot, title):
+        super().__init__()
         self.bot = bot
-        self.channel = channel
-        self.add_item(CogSelect(bot, title, channel))
+        self.title = title
+        self.message = None  # 新增一個 message 屬性
+        self.add_item(CogSelect(bot, title))
 
 class CogSelect(discord.ui.Select):
     def __init__(self, bot, title, channel=None):
@@ -25,6 +26,11 @@ class CogSelect(discord.ui.Select):
 
         if operation_class:
             operation = operation_class(self.bot, interaction, self.channel)
-            await operation.execute(cog_name)
+            result = await operation.execute(cog_name)
+            await interaction.response.defer()
+            await interaction.followup.send(result, ephemeral=True)
         else:
             await interaction.response.send_message("未知的操作類型。", ephemeral=True)
+        
+        await interaction.delete_original_response()
+        self.view.stop()

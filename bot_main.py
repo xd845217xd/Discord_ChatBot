@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 from discord.ext import commands
 from discord import app_commands
-from components.cog_select_view import CogSelectView
+from components.cog_control_view import CogControlView
 from components.clear_confirm_view import ClearConfirmView
-from components.api_select_view import APISelectView
+from components import operations
 from dotenv import load_dotenv
 
 # 從 .env 檔案載入環境設定檔，token那類的
@@ -25,13 +25,18 @@ class Bot(commands.Bot):
         super().__init__(command_prefix, intents=intents)
         self.config_paths = {
             'channel': 'configs/channel_setup_config.json',
-            'api': 'configs/api_select_config.json',
-            'cogs_config': 'configs/cog_mapping_config.json'
+            'cogs_config': 'configs/cog_mapping_config.json',
+            'api_module': 'configs/api_module_config.json',
+            'prompt': 'configs/prompt_config.json'
         }
         self.config_defaults = {
             'channel': {},
-            'api': {},
-            'cogs_config': {"cogs_mapping": {}}
+            'cogs_config': {"cogs_mapping": {}},
+            'api_module': {},
+            'prompt': {
+                "default": "你是一個得力的助手,致力於提供詳盡且有幫助的回答。",
+                "prompts": []
+            }
         }
         self.load_all_configs()
 
@@ -55,7 +60,7 @@ class Bot(commands.Bot):
     def save_config(self, config, file_path):
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4)
+                json.dump(config, f, indent=4, ensure_ascii=False)
         except IOError as e:
             print(f"Error saving {file_path}: {str(e)}")
 
@@ -80,21 +85,18 @@ async def on_ready():
 # 定義斜線指令
 @bot.tree.command(name="load", description="載入模組")
 async def load_cog(interaction: discord.Interaction):
-    # 發送帶有下拉選單的訊息讓用戶選擇要載入的模組
-    view = CogSelectView(bot, title="load")
-    await interaction.response.send_message("請選擇要載入的模組：", view=view, ephemeral=True)
+    view = CogControlView(bot, title="load")
+    await interaction.response.send_message("請選擇要載入的模組:", view=view, ephemeral=True)
 
 @bot.tree.command(name="unload", description="卸載模組")
 async def unload_cog(interaction: discord.Interaction):
-    # 發送帶有下拉選單的訊息讓用戶選擇要卸載的模組
-    view = CogSelectView(bot, title="unload")
-    await interaction.response.send_message("請選擇要卸載的模組：", view=view, ephemeral=True)
+    view = CogControlView(bot, title="unload")
+    await interaction.response.send_message("請選擇要卸載的模組:", view=view, ephemeral=True)
 
 @bot.tree.command(name="reload", description="重新載入模組")
 async def reload_cog(interaction: discord.Interaction):
-    # 發送帶有下拉選單的訊息讓用戶選擇要重新載入的模組
-    view = CogSelectView(bot, title="reload")
-    await interaction.response.send_message("請選擇要重新載入的模組：", view=view, ephemeral=True)
+    view = CogControlView(bot, title="reload")
+    await interaction.response.send_message("請選擇要重新載入的模組:", view=view, ephemeral=True)
 
 @bot.tree.command(name="test", description="測試指令")
 async def test_command(interaction: discord.Interaction):
@@ -124,10 +126,9 @@ async def show_mapping(interaction: discord.Interaction):
     # 發送最終回應
     await interaction.followup.send(f"目前的 cog 映射表：\n{mapping}")
 
-@bot.tree.command(name="select_api", description="選擇要使用的 API")
-async def select_api(interaction: discord.Interaction):
-    view = APISelectView()
-    await interaction.response.send_message("請選擇要使用的 API:", view=view, ephemeral=True)
+@bot.tree.command(name="clear_history", description="清理歷史訊息")
+async def clear_history(interaction: discord.Interaction):
+    await operations.OPERATIONS['clearhistoryandrestartcog'](bot, interaction).execute()
 
 # 自動載入 cogs跟llms 目錄下的所有擴展
 async def load_extensions(directory):
