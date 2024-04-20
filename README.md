@@ -9,9 +9,10 @@ DiscordBot/
 │
 ├── bot_main.py
 ├── configs/
-│   ├── api_select_config.json
+│   ├── api_module_config.json
 │   ├── channel_setup_config.json
-│   └── cog_mapping_config.json
+│   ├── cog_mapping_config.json
+│   └── prompt_config.json
 │
 ├── cogs/
 │   ├── channel_setup_cog.py
@@ -19,36 +20,38 @@ DiscordBot/
 │   └── text_channel_cog.py
 │
 ├── components/
-│   ├── api_select_view.py
+│   ├── channel_setup_view.py
 │   ├── clear_confirm_view.py
-│   ├── cog_select_view.py
+│   ├── cog_control_view.py
 │   └── operations.py
 │
 └── llms/
+    ├── cohere_chat_cog.py
     ├── openrouter_chat_cog.py.py
     └── openai_chat_cog.py
 ```
 
 ## 主要檔案說明
 
-- `bot_main.py`: 專案的主程式,負責初始化和啟動Discord機器人。
+- `bot_main.py`: 專案的主程式,負責初始化和啟動 Discord 機器人。
 - `configs/`: 存放各種設定文件。
-  - `api_select_config.json`: 儲存選擇的 API 的設定。
-  - `channel_setup_config.json`: 儲存 Cog 應用頻道的設定。
+  - `api_module_config.json`: 不同的 API 有不同可以選擇的 Module ，在這裡可以預先寫好讓用戶選擇。
+  - `channel_setup_config.json`: 儲存 Cog 應用頻道、包含使用的 API 、 Module 與 Prompt 的設定。
   - `cog_mapping_config.json`: 儲存 Cog 對應中文名稱的設定。
+  - `prompt_config.json`: 儲存 Prompt ， Name 是用戶的選擇， Content 則是實際上要給 API 的提示詞。
 
 ## Cogs 說明
 
-- `channel_setup_cog.py`: 負責設定 Cog 對應頻道。
+- `channel_setup_cog.py`: 負責設定 Cog 對應頻道與使用的 API 、 Module 與 Prompt 。
 - `message_cog.py`: 可以使用 "/chat" 呼叫對話框,與 OpenAI API 對話。
 - `text_channel_cog.py`: 負責在文字頻道上,透過選擇的 API 處理一般對話的功能。
 
 ## Components 說明
 
-- `api_select_view.py`: 實現選擇 API 的 Discord 互動介面。
-- `clear_confirm_view.py`: 實現清空指定頻道所有訊息的 Discord 互動介面。
-- `cog_select_view.py`: 實現幫 Cog 選擇指定使用頻道的 Discord 互動介面。
-- `operations.py`: bot_main.py 裡面斜線指令對應的程式邏輯都在這裡。
+- `channel_setup_view.py`: 實現 channel_setup_cog.py 的 Discord 互動介面。
+- `clear_confirm_view.py`: 實現清空指定頻道指令 /clear_channel 所有訊息的 Discord 互動介面。
+- `cog_control_view.py`: 實現 /load 、 /reload 跟 /unload 指令選擇對應Cog 的 Discord 互動介面。
+- `operations.py`: 各個 _view.py 裡面斜線指令對應的程式邏輯都在這裡。
 
 ## LLMs 說明
 
