@@ -23,7 +23,7 @@ class CohereChatCog(commands.Cog):
             }
 
         user_history = self.chat_history[channel_id][user_id]
-        user_history["messages"].append({"role": "user", "message": message.content})
+        user_history["messages"].append({"role": "USER", "message": message.content})
         messages_for_api = user_history["messages"][-5:]
 
         if message.id == user_history["last_processed_message_id"]:
@@ -43,8 +43,8 @@ class CohereChatCog(commands.Cog):
             )
 
         bot_reply = response.text
-        mention = message.author.mention
-        await message.reply(f"{mention} {bot_reply}")
+        user_history["messages"].append({"role": "CHATBOT", "message": bot_reply})
+        return {"response": bot_reply}
 
 async def setup(bot):
-    await bot.add_cog(CohereChatCog(bot))  # 將 Cog 添加到 bot 中
+    await bot.add_cog(CohereChatCog(bot))

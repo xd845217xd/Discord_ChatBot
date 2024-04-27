@@ -40,8 +40,8 @@ class OpenAIChatCog(commands.Cog):
             )
 
         bot_reply = response.choices[0].message.content
-        mention = message.author.mention
-        await message.reply(f"{mention} {bot_reply}")
+        user_history["messages"].append({"role": "assistant", "content": bot_reply})
+        return {"response": bot_reply}
 
 async def setup(bot):
     await bot.add_cog(OpenAIChatCog(bot))  # 將 Cog 添加到 bot 中

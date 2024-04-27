@@ -6,6 +6,10 @@ import json
 class TextChannelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+    
+    async def send_response(self, message, response):
+        mention = message.author.mention
+        await message.reply(f"{mention} {response}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -30,8 +34,9 @@ class TextChannelCog(commands.Cog):
             # 獲取指定名稱的 cog
             api_cog = self.bot.get_cog(cog_name)
             if api_cog:
-                # 如果 cog 存在,則呼叫該 cog 的 process_message 方法處理訊息
-                await api_cog.process_message(message, api, module, prompt_content)
+                result = await api_cog.process_message(message, api, module, prompt_content)
+                if result and "response" in result:
+                    await self.send_response(message, result["response"])
             else:
                 await message.channel.send(f"{cog_name} 尚未加載。")
         else:
@@ -62,9 +67,20 @@ class TextChannelCog(commands.Cog):
         if not user_history:
             await interaction.response.send_message("找不到你與機器人的聊天記錄。")
             return
+        
+        # 後台輸出完整的聊天記錄物件。除錯用的，要用再把 # 拿掉
+        # print(f"聊天記錄 - 頻道: {channel_id}, 用戶: {user_id}")
+        # print(user_history)
 
         # 組合聊天記錄文本並回應
-        history_text = "\n".join(f"{msg['role']}: {msg['content']}" for msg in user_history)
+        if 'content' in user_history[0]:
+            # OpenAI 和 OpenRouter 的聊天記錄格式
+            history_text = "\n".join(f"{msg['role']}: {msg['content']}" for msg in user_history)
+        else:
+            # Cohere 的聊天記錄格式
+            history_text = "\n".join(f"{msg['role']}: {msg['message']}" for msg in user_history)
+
+        # 發送回應
         await interaction.response.send_message(f"你與機器人的聊天記錄:\n{history_text}")
 
 async def setup(bot):
