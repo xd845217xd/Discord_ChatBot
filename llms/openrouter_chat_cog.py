@@ -14,7 +14,7 @@ class OpenRouterChatCog(commands.Cog):
 
     async def process_message(self, message, api, module, prompt):
         user_id = str(message.author.id)
-        channel_id = message.channel.id
+        channel_id = str(message.channel.id)
 
         if channel_id not in self.chat_history:
             self.chat_history[channel_id] = {}

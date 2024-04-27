@@ -36,6 +36,36 @@ class TextChannelCog(commands.Cog):
                 await message.channel.send(f"{cog_name} 尚未加載。")
         else:
             return  # 如果條件不符,則不執行任何操作
+    
+    @discord.app_commands.command(name="chat_history", description="檢查你與機器人的聊天記錄")
+    async def chat_history(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild_id)
+        channel_id = str(interaction.channel_id)
+        user_id = str(interaction.user.id)
+
+        # 簡化條件判斷，提前返回以減少嵌套深度
+        if guild_id not in self.bot.channel or channel_id not in self.bot.channel[guild_id]:
+            await interaction.response.send_message("該頻道未配置機器人。")
+            return
+
+        channel_config = self.bot.channel[guild_id][channel_id]
+        cog_name = channel_config['cog']
+        api_cog = self.bot.get_cog(cog_name)
+
+        # 檢查cog是否加載及是否具有所需屬性
+        if not api_cog or not hasattr(api_cog, 'chat_history'):
+            await interaction.response.send_message(f"{cog_name} 尚未加載或沒有 chat_history 屬性。")
+            return
+
+        # 獲取用戶聊天記錄
+        user_history = api_cog.chat_history.get(channel_id, {}).get(user_id, {}).get("messages", None)
+        if not user_history:
+            await interaction.response.send_message("找不到你與機器人的聊天記錄。")
+            return
+
+        # 組合聊天記錄文本並回應
+        history_text = "\n".join(f"{msg['role']}: {msg['content']}" for msg in user_history)
+        await interaction.response.send_message(f"你與機器人的聊天記錄:\n{history_text}")
 
 async def setup(bot):
     await bot.add_cog(TextChannelCog(bot))
