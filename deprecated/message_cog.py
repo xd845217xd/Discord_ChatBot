@@ -12,7 +12,7 @@ class MessageCog(commands.Cog):
         self.client = OpenAI(api_key=os.getenv('OPENAI_TOKEN'))
         self.chat_history = {}
 
-    @discord.app_commands.command(name="chat", description="與ChatGPT聊天")
+    @discord.app_commands.command(name="deprecated_chat", description="與ChatGPT聊天")
     async def chat(self, interaction: discord.Interaction, message: str):
         channel_id = str(interaction.channel_id)
         user_id = str(interaction.user.id)

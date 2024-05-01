@@ -9,7 +9,7 @@ class CohereChatCog(commands.Cog):
         self.client = cohere.Client(os.getenv('COHERE_API_KEY'))
         self.chat_history = {}
 
-    async def process_message(self, message, api, module, prompt):
+    async def process_message(self, message, api, module, prompt, chat_history=None):
         user_id = str(message.author.id)
         channel_id = str(message.channel.id)
 
@@ -21,14 +21,14 @@ class CohereChatCog(commands.Cog):
                 "messages": [],
                 "last_processed_message_id": None
             }
+            
+        if chat_history is None:
+            user_history = self.chat_history[channel_id][user_id]["messages"]
+        else:
+            user_history = chat_history
 
-        user_history = self.chat_history[channel_id][user_id]
-        user_history["messages"].append({"role": "USER", "message": message.content})
-        messages_for_api = user_history["messages"][-5:]
-
-        if message.id == user_history["last_processed_message_id"]:
-            return
-        user_history["last_processed_message_id"] = message.id
+        user_history.append({"role": "USER", "message": message.content})
+        messages_for_api = user_history[-5:]
 
         async with message.channel.typing():
             response = self.client.chat(
@@ -43,8 +43,10 @@ class CohereChatCog(commands.Cog):
             )
 
         bot_reply = response.text
-        user_history["messages"].append({"role": "CHATBOT", "message": bot_reply})
+        user_history.append({"role": "CHATBOT", "message": bot_reply})
+        self.chat_history[channel_id][user_id]["messages"] = user_history
         return {"response": bot_reply}
 
 async def setup(bot):
-    await bot.add_cog(CohereChatCog(bot))
+    cohere_chat_cog = CohereChatCog(bot)
+    await bot.add_cog(cohere_chat_cog)

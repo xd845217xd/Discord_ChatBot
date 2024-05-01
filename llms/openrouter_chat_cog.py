@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands
-import os
-import datetime
 from openai import OpenAI
+import os
 
 class OpenRouterChatCog(commands.Cog):
     def __init__(self, bot):
@@ -12,7 +11,7 @@ class OpenRouterChatCog(commands.Cog):
         self.chat_history = {}
         self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
 
-    async def process_message(self, message, api, module, prompt):
+    async def process_message(self, message, api, module, prompt, chat_history=None):
         user_id = str(message.author.id)
         channel_id = str(message.channel.id)
 
@@ -25,15 +24,15 @@ class OpenRouterChatCog(commands.Cog):
                 "last_processed_message_id": None
             }
 
-        user_history = self.chat_history[channel_id][user_id]
-        user_history["messages"].append({"role": "user", "content": message.content})
-        messages_for_api = user_history["messages"][-5:]
+        if chat_history is None:
+            user_history = self.chat_history[channel_id][user_id]["messages"]
+        else:
+            user_history = chat_history
+
+        user_history.append({"role": "user", "content": message.content})
+        messages_for_api = user_history[-5:]
 
         messages_for_api.append({"role": "system", "content": prompt})
-
-        if message.id == user_history["last_processed_message_id"]:
-            return
-        user_history["last_processed_message_id"] = message.id
 
         async with message.channel.typing():
             response = self.client.chat.completions.create(
@@ -44,8 +43,10 @@ class OpenRouterChatCog(commands.Cog):
             )
 
         bot_reply = response.choices[0].message.content
-        user_history["messages"].append({"role": "assistant", "content": bot_reply})
+        user_history.append({"role": "assistant", "content": bot_reply})
+        self.chat_history[channel_id][user_id]["messages"] = user_history
         return {"response": bot_reply}
 
 async def setup(bot):
-    await bot.add_cog(OpenRouterChatCog(bot)) # 將 Cog 添加到 bot 中
+    openrouter_chat_cog = OpenRouterChatCog(bot)
+    await bot.add_cog(openrouter_chat_cog)

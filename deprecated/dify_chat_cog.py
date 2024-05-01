@@ -85,4 +85,5 @@ class DifyChatCog(commands.Cog):
             await ctx.send(f"No conversation found for {ctx.author.name}.")  # 發送沒有找到對話的訊息
 
 async def setup(bot):
-    await bot.add_cog(DifyChatCog(bot))  # 將 Cog 添加到 bot 中
+    dify_chat_cog = DifyChatCog(bot)
+    await bot.add_cog(dify_chat_cog)

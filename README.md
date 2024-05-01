@@ -16,12 +16,12 @@ DiscordBot/
 │
 ├── cogs/
 │   ├── channel_setup_cog.py
-│   ├── message_cog.py
 │   └── text_channel_cog.py
 │
 ├── components/
 │   ├── channel_setup_view.py
 │   ├── clear_confirm_view.py
+│   ├── text_channel_view.py
 │   ├── cog_control_view.py
 │   └── operations.py
 │
@@ -43,13 +43,13 @@ DiscordBot/
 ## Cogs 說明
 
 - `channel_setup_cog.py`: 負責設定 Cog 對應頻道與使用的 API 、 Module 與 Prompt 。
-- `message_cog.py`: 可以使用 "/chat" 呼叫對話框,與 OpenAI API 對話。
-- `text_channel_cog.py`: 負責在文字頻道上,透過選擇的 API 處理一般對話的功能。
+- `text_channel_cog.py`: 負責在文字頻道上,可以使用 "/chat" 呼叫對話框,透過選擇的 API 處理一般對話的功能。
 
 ## Components 說明
 
 - `channel_setup_view.py`: 實現 channel_setup_cog.py 的 Discord 互動介面。
 - `clear_confirm_view.py`: 實現清空指定頻道指令 /clear_channel 所有訊息的 Discord 互動介面。
+- `text_channel_view.py`: 實現 text_channel_cog.py 重新生成回應按鈕 的 Discord 互動介面。
 - `cog_control_view.py`: 實現 /load 、 /reload 跟 /unload 指令選擇對應Cog 的 Discord 互動介面。
 - `operations.py`: 各個 _view.py 裡面斜線指令對應的程式邏輯都在這裡。
 
