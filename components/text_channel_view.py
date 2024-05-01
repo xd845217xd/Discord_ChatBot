@@ -22,29 +22,14 @@ class RegenerateButton(Button):
 
         await interaction.response.defer()
 
-        channel_id = str(interaction.channel_id)
-        user_id = str(interaction.user.id)
-
-        # 根據特殊標記找到要編輯的embed訊息
-        async for msg in interaction.channel.history(limit=100):
-            if msg.author == interaction.client.user and msg.embeds and msg.embeds[0].footer.text == f"regenerate_id:{unique_id}":
-                original_message = msg
-                break
-        else:
-            await interaction.followup.send("找不到原始訊息。", ephemeral=True)
-            return
-
         text_channel_cog = interaction.client.get_cog("TextChannelCog")
-        if text_channel_cog:
-            success = await text_channel_cog.regenerate_response(original_message, channel_id, user_id)
-            if success:
-                # 如果重新生成成功,移除當前的按鈕
-                await interaction.message.edit(view=None)
-                await interaction.followup.send("訊息已重新生成。", ephemeral=True)
-            else:
-                await interaction.followup.send("重新生成訊息時發生錯誤。", ephemeral=True)
-        else:
+        if not text_channel_cog:
             await interaction.followup.send("TextChannelCog 未載入。", ephemeral=True)
+        elif not (original_message := await text_channel_cog.find_original_message(interaction.channel, unique_id)):
+            await interaction.followup.send("找不到原始訊息。", ephemeral=True)
+        else:
+            success = await text_channel_cog.regenerate_response(original_message, str(interaction.channel.id), str(interaction.user.id))
+            await interaction.followup.send("訊息已重新生成。" if success else "重新生成訊息時發生錯誤。", ephemeral=True)
 
 class ResendButton(Button):
     def __init__(self, user_id):
@@ -56,11 +41,17 @@ class ResendButton(Button):
             await interaction.response.send_message("只有發起對話的用戶才能使用此按鈕。", ephemeral=True)
             return
 
-        response_text = interaction.message.embeds[0].fields[1].value
-        await interaction.response.send_message(response_text, ephemeral=True)
+        if interaction.message.embeds and interaction.message.embeds[0].fields:
+            response_text = interaction.message.embeds[0].fields[1].value
+            await interaction.response.send_message(response_text, ephemeral=True)
+        else:
+            await interaction.response.send_message("找不到回應內容。", ephemeral=True)
 
 class EmbedChatView(View):
     def __init__(self, user_id, timeout=14400):  # 4小時
         super().__init__(timeout=timeout)
         self.add_item(RegenerateButton(user_id))
         self.add_item(ResendButton(user_id))
+
+    async def on_timeout(self):
+        await self.message.edit(view=None)
