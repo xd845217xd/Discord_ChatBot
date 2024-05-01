@@ -17,7 +17,7 @@ class RegenerateButton(Button):
             await interaction.followup.send("找不到原始訊息或訊息格式不正確。", ephemeral=True)
             return
 
-        unique_id = interaction.message.embeds[0].footer.text.split("regenerate_id:")[1]
+        unique_id = interaction.message.embeds[0].footer.text.split("EmbedChat_ID:")[1]
         print(f"Extracted UUID from footer: {unique_id}")
 
         await interaction.response.defer()

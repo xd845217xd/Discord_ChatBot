@@ -6,7 +6,7 @@ from components.text_channel_view import EmbedChatView
 class TextChannelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.EMBED_COLOR = 0x1a1a1a
+        self.EMBED_COLOR = 0xedff94
 
     async def get_channel_config_and_cog(self, guild_id, channel_id):
         if guild_id in self.bot.channel and channel_id in self.bot.channel[guild_id]:
@@ -31,12 +31,12 @@ class TextChannelCog(commands.Cog):
                 result = await api_cog.process_message(message, channel_config['api'], channel_config['module'], prompt_content)
                 if result and "response" in result:
                     response = result["response"]
-                    embed = discord.Embed(title="Chat Session", description="", color=self.EMBED_COLOR)
+                    embed = discord.Embed(title="聊天對話", description="", color=self.EMBED_COLOR)
                     embed.add_field(name=f"{message.author.display_name}", value=message.content, inline=False)
                     embed.add_field(name=f"{message.guild.me.display_name}", value=response, inline=False)
 
                     unique_id = str(uuid.uuid4())
-                    embed.set_footer(text=f"regenerate_id:{unique_id}")
+                    embed.set_footer(text=f"EmbedChat_ID:{unique_id}")
                     
                     async for prev_msg in message.channel.history(limit=10):
                         if prev_msg.author == self.bot.user and prev_msg.embeds:
@@ -53,7 +53,7 @@ class TextChannelCog(commands.Cog):
 
     async def find_original_message(self, channel, unique_id):
         async for msg in channel.history(limit=100):
-            if msg.author == self.bot.user and msg.embeds and msg.embeds[0].footer.text == f"regenerate_id:{unique_id}":
+            if msg.author == self.bot.user and msg.embeds and msg.embeds[0].footer.text == f"EmbedChat_ID:{unique_id}":
                 return msg
         return None
     
@@ -87,7 +87,7 @@ class TextChannelCog(commands.Cog):
         try:
             if result and "response" in result:
                 response = result["response"]
-                unique_id = message.embeds[0].footer.text.split("regenerate_id:")[1]
+                unique_id = message.embeds[0].footer.text.split("EmbedChat_ID:")[1]
 
                 last_embed_message = await self.find_original_message(message.channel, unique_id)
 
