@@ -1,5 +1,6 @@
 import discord
 import uuid
+import traceback
 from discord.ext import commands
 from components.text_channel_view import EmbedChatView
 
@@ -36,14 +37,20 @@ class TextChannelCog(commands.Cog):
                     embed.add_field(name=f"{message.guild.me.display_name}", value=response, inline=False)
 
                     unique_id = str(uuid.uuid4())
-                    embed.set_footer(text=f"EmbedChat_ID:{unique_id}")
+                    embed.set_footer(text=f"EmbedChat_ID:{unique_id}/UserID:{message.author.id}")
                     
-                    async for prev_msg in message.channel.history(limit=10):
+                    # 移除該用戶之前的所有embed訊息按鈕
+                    async for prev_msg in message.channel.history(limit=None):
                         if prev_msg.author == self.bot.user and prev_msg.embeds:
-                            await prev_msg.edit(view=None)
-                            break
+                            prev_embed = prev_msg.embeds[0]
+                            if prev_embed.footer:
+                                footer_parts = prev_embed.footer.text.split("/")
+                                if len(footer_parts) == 2 and footer_parts[1] == f"UserID:{message.author.id}":
+                                    await prev_msg.edit(view=None)
+                            else:
+                                print(f"發現没有預期footer的embed訊息: {prev_msg.id}")
                     
-                    view = EmbedChatView(message.author.id)
+                    view = EmbedChatView(message.author.id, unique_id)
                     embed_chat_message = await message.reply(embed=embed, view=view)
                     view.message = embed_chat_message  # 設置 message 屬性
                 else:
@@ -51,9 +58,9 @@ class TextChannelCog(commands.Cog):
             else:
                 await message.channel.send("該頻道未設定機器人。")
 
-    async def find_original_message(self, channel, unique_id):
+    async def find_original_message(self, channel, unique_id, user_id):
         async for msg in channel.history(limit=100):
-            if msg.author == self.bot.user and msg.embeds and msg.embeds[0].footer.text == f"EmbedChat_ID:{unique_id}":
+            if msg.author == self.bot.user and msg.embeds and msg.embeds[0].footer.text == f"EmbedChat_ID:{unique_id}/UserID:{user_id}":
                 return msg
         return None
     
@@ -87,9 +94,11 @@ class TextChannelCog(commands.Cog):
         try:
             if result and "response" in result:
                 response = result["response"]
-                unique_id = message.embeds[0].footer.text.split("EmbedChat_ID:")[1]
+                footer_info = message.embeds[0].footer.text.split("/")
+                unique_id = footer_info[0].split("EmbedChat_ID:")[1]
+                user_id = int(footer_info[1].split("UserID:")[1])
 
-                last_embed_message = await self.find_original_message(message.channel, unique_id)
+                last_embed_message = await self.find_original_message(message.channel, unique_id, user_id)
 
                 if last_embed_message:
                     embed = last_embed_message.embeds[0]
@@ -97,13 +106,14 @@ class TextChannelCog(commands.Cog):
                     await last_embed_message.edit(embed=embed)
                     
                     # 更新 chat_history
-                    api_cog.chat_history[channel_id][user_id]["messages"] = user_history
+                    api_cog.chat_history[channel_id][str(user_id)]["messages"] = user_history
 
                     return True
                 else:
                     await message.channel.send("找不到原始訊息,重新生成失敗。")
         except Exception as e:
             print(f"update_response 發生異常: {str(e)}")
+            traceback.print_exc()
         return False
 
     @discord.app_commands.command(name="chat_history", description="檢查你與機器人的聊天記錄")

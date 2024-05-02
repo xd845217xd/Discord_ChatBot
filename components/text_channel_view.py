@@ -17,15 +17,17 @@ class RegenerateButton(Button):
             await interaction.followup.send("找不到原始訊息或訊息格式不正確。", ephemeral=True)
             return
 
-        unique_id = interaction.message.embeds[0].footer.text.split("EmbedChat_ID:")[1]
-        print(f"Extracted UUID from footer: {unique_id}")
+        footer_info = interaction.message.embeds[0].footer.text.split("/")
+        unique_id = footer_info[0].split("EmbedChat_ID:")[1]
+        user_id = int(footer_info[1].split("UserID:")[1])
+        print(f"Extracted UUID from footer: {unique_id}, User ID: {user_id}")
 
         await interaction.response.defer()
 
         text_channel_cog = interaction.client.get_cog("TextChannelCog")
         if not text_channel_cog:
             await interaction.followup.send("TextChannelCog 未載入。", ephemeral=True)
-        elif not (original_message := await text_channel_cog.find_original_message(interaction.channel, unique_id)):
+        elif not (original_message := await text_channel_cog.find_original_message(interaction.channel, unique_id, user_id)):
             await interaction.followup.send("找不到原始訊息。", ephemeral=True)
         else:
             success = await text_channel_cog.regenerate_response(original_message, str(interaction.channel.id), str(interaction.user.id))
@@ -48,10 +50,17 @@ class ResendButton(Button):
             await interaction.response.send_message("找不到回應內容。", ephemeral=True)
 
 class EmbedChatView(View):
-    def __init__(self, user_id, timeout=14400):  # 4小時
+    def __init__(self, user_id, unique_id, timeout=14400):  # 4小時
         super().__init__(timeout=timeout)
+        self.user_id = user_id
+        self.unique_id = unique_id
         self.add_item(RegenerateButton(user_id))
         self.add_item(ResendButton(user_id))
+
+    async def on_timeout(self):
+        original_message = await self.find_original_message(self.message.channel, self.unique_id, self.user_id)
+        if original_message:
+            await original_message.edit(view=None)
 
     async def on_timeout(self):
         await self.message.edit(view=None)
