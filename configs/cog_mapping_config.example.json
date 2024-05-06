@@ -1,7 +1,7 @@
 {
   "cogs_mapping": {
-      "message_cog": "個人對話框",
       "text_channel_cog": "公開聊天室",
+      "scheduled_tasks_cog.py": "定時任務管理",
       "channel_setup_cog": "頻道設定管理"
   }
 }

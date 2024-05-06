@@ -8,10 +8,9 @@ from discord.ext import commands
 from discord import app_commands
 from components.cog_control_view import CogControlView
 from components.clear_confirm_view import ClearConfirmView
-from components import operations
 from dotenv import load_dotenv
 
-# 從 .env 檔案載入環境設定檔，token那類的
+# 從 .env 檔案載入環境設定檔,例如Discord機器人的Token
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(name)s: %(message)s')
@@ -19,7 +18,7 @@ logger = logging.getLogger('discord')
 
 discord_token = os.getenv('DISCORD_TOKEN')
 
-# 載入設定檔，就是那些json檔案
+# 載入設定檔,例如JSON格式的配置文件
 class Bot(commands.Bot):
     def __init__(self, command_prefix, intents):
         super().__init__(command_prefix, intents=intents)
@@ -27,7 +26,8 @@ class Bot(commands.Bot):
             'channel': 'configs/channel_setup_config.json',
             'cogs_config': 'configs/cog_mapping_config.json',
             'api_module': 'configs/api_module_config.json',
-            'prompt': 'configs/prompt_config.json'
+            'prompt': 'configs/prompt_config.json',
+            'scheduled_tasks': 'configs/scheduled_tasks_config.json'
         }
         self.config_defaults = {
             'channel': {},
@@ -36,7 +36,8 @@ class Bot(commands.Bot):
             'prompt': {
                 "default": "你是一個得力的助手,致力於提供詳盡且有幫助的回答。",
                 "prompts": []
-            }
+            },
+            'scheduled_tasks': {}
         }
         self.load_all_configs()
 
@@ -66,7 +67,18 @@ class Bot(commands.Bot):
 
     async def setup_hook(self):
         # 加載 cogs 或其他啟動設定
-        pass
+        await load_extensions("cogs")
+        await load_extensions("llms")
+
+        # 同步斜線命令
+        await self.tree.sync()
+        print("已同步斜線命令。")
+
+        # 打印已加載的模組、Cog和斜線命令
+        print(f'{self.user.name} 已經連接到 Discord!', flush=True)
+        print("已載入的模組:", self.extensions.keys(), flush=True)
+        print("已加載的 Cog:", [cog_name for cog_name in self.cogs], flush=True)
+        print("已加載的斜線命令:", [cmd.name for cmd in self.tree.get_commands()])
 
 # 初始化 Intents
 intents = discord.Intents.all()
@@ -74,15 +86,7 @@ intents = discord.Intents.all()
 # 建立一個 commands.Bot 實例
 bot = Bot(command_prefix='!', intents=intents)
 
-# 註冊斜線指令前，必須在 on_ready 事件中同步指令
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f'{bot.user.name} 已經連接到 Discord!', flush=True)
-    print("已載入的模組:", bot.extensions.keys(), flush=True)
-    print("已加載的 Cog:", [cog_name for cog_name in bot.cogs], flush=True)
-
-# 定義斜線指令
+# 定義斜線命令
 @bot.tree.command(name="load", description="載入模組")
 async def load_cog(interaction: discord.Interaction):
     view = CogControlView(bot, title="load")
@@ -126,10 +130,6 @@ async def show_mapping(interaction: discord.Interaction):
     # 發送最終回應
     await interaction.followup.send(f"目前的 cog 映射表：\n{mapping}")
 
-@bot.tree.command(name="clear_history", description="清理歷史訊息")
-async def clear_history(interaction: discord.Interaction):
-    await operations.OPERATIONS['clearhistoryandrestartcog'](bot, interaction).execute()
-
 # 自動載入 cogs跟llms 目錄下的所有擴展
 async def load_extensions(directory):
     for filename in os.listdir(f"./{directory}"):
@@ -137,8 +137,6 @@ async def load_extensions(directory):
             await bot.load_extension(f"{directory}.{filename[:-3]}")
 
 async def main():
-    await load_extensions("cogs")
-    await load_extensions("llms")
     await bot.start(discord_token)
 
 if __name__ == '__main__':

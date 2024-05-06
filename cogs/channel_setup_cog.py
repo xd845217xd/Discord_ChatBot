@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from components.channel_setup_view import ChannelSetupView, ChannelSelectView
+from components.channel_setup_view import ChannelSelectView
 import json
 
 class ChannelSetupCog(commands.Cog):
@@ -20,12 +20,6 @@ class ChannelSetupCog(commands.Cog):
             await interaction.response.send_message("\n".join(channel_setups))
         else:
             await interaction.response.send_message("此伺服器尚未設定特定頻道。")
-
-    @discord.app_commands.command(name='configuresetup', description='設定特定頻道、語言模型、模組和提示詞')
-    async def configure_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        # 創建一個 ChannelSetupView 實例,用於設定特定頻道的語言模型、模組和提示詞
-        view = ChannelSetupView(self.bot, channel)
-        await interaction.response.send_message("請選擇要配置的語言模型、模組和提示詞:", view=view, ephemeral=True)
 
     @discord.app_commands.command(name='removesetup', description='移除特定頻道設定')
     async def remove_channel(self, interaction: discord.Interaction):
