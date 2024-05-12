@@ -13,6 +13,17 @@ class RegenerateButton(Button):
             await interaction.response.send_message("只有發起對話的用戶才能使用此按鈕。", ephemeral=True)
             return False
         return True
+    
+    def extract_ids_from_footer(self, footer_text: str) -> tuple[str, str]:
+        """從 footer 文本中提取 message_id 和 user_id"""
+        parts = footer_text.split("/")
+        if len(parts) != 2:
+            raise ValueError("無效的 footer 格式")
+
+        message_id = parts[0].split("MessageID:")[1]
+        user_id = parts[1].split("UserID:")[1]
+        return message_id, user_id
+
 
     async def callback(self, interaction: discord.Interaction):
         # 檢查用戶權限
@@ -24,10 +35,13 @@ class RegenerateButton(Button):
             await interaction.followup.send("找不到原始訊息或訊息格式不正確。", ephemeral=True)
             return
 
-        # 從訊息的 footer 中提取 unique_id 和 user_id
-        footer_info = interaction.message.embeds[0].footer.text.split("/")
-        unique_id = footer_info[0].split("EmbedChat_ID:")[1]
-        user_id = int(footer_info[1].split("UserID:")[1])
+        # 從訊息的 footer 中提取 message_id 和 user_id
+        footer_text = interaction.message.embeds[0].footer.text
+        try:
+            message_id, user_id = self.extract_ids_from_footer(footer_text)
+        except ValueError:
+            await interaction.followup.send("無法從訊息 footer 中提取必要的資訊。", ephemeral=True)
+            return
 
         await interaction.response.defer()
 
@@ -38,12 +52,12 @@ class RegenerateButton(Button):
             return
 
         # 尋找原始訊息
-        found_message = await text_channel_cog.find_original_message(interaction.channel, unique_id, user_id)
+        found_message = await text_channel_cog.find_original_message(interaction.channel, int(message_id), int(user_id))
         if not found_message:
             await interaction.followup.send("找不到原始訊息。", ephemeral=True)
         else:
             # 重新生成回應
-            success = await text_channel_cog.regenerate_response(found_message, str(interaction.channel.id), str(interaction.user.id))
+            success = await text_channel_cog.regenerate_response(found_message, str(interaction.channel.id), user_id)
             await interaction.followup.send("訊息已重新生成。" if success else "重新生成訊息時發生錯誤。", ephemeral=True)
 
 class ResendButton(Button):
@@ -80,10 +94,9 @@ class ClearHistoryConfirmView(View):
         self.stop()
 
 class EmbedChatView(View):
-    def __init__(self, user_id: int, unique_id: str, timeout: float = 14400):  # 4小時
+    def __init__(self, user_id: int, timeout: float = 14400):  # 4小時
         super().__init__(timeout=timeout)
         self.user_id = user_id
-        self.unique_id = unique_id
         self.add_item(RegenerateButton(user_id))
         self.add_item(ResendButton())
 

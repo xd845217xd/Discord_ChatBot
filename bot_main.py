@@ -3,6 +3,7 @@ import os
 import asyncio
 import logging
 import json
+import signal
 from pathlib import Path
 from discord.ext import commands
 from discord import app_commands
@@ -79,6 +80,13 @@ class Bot(commands.Bot):
         print("已載入的模組:", self.extensions.keys(), flush=True)
         print("已加載的 Cog:", [cog_name for cog_name in self.cogs], flush=True)
         print("已加載的斜線命令:", [cmd.name for cmd in self.tree.get_commands()])
+    
+    async def close(self):
+        print("正在關閉 Redis 連接...")
+        if hasattr(self, 'redis_cog') and self.redis_cog.redis_client:
+            await self.redis_cog.redis_close()
+        print("Redis 連接已關閉。")
+        await super().close()  # 確保調用父類的 close 方法來處理其他清理工作
 
 # 初始化 Intents
 intents = discord.Intents.all()
@@ -136,8 +144,19 @@ async def load_extensions(directory):
         if filename.endswith(".py"):
             await bot.load_extension(f"{directory}.{filename[:-3]}")
 
+def handle_shutdown_signal():
+    print("收到終止信號，正在關閉 bot...")
+    asyncio.create_task(bot.close())
+
 async def main():
-    await bot.start(discord_token)
+    try:
+        await bot.start(discord_token)
+    except KeyboardInterrupt:
+        print('收到 Ctrl+C，正在關閉 bot...')
+    finally:
+        await bot.close()
+        print('Bot 已安全關閉。')
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, lambda x, y: handle_shutdown_signal())
     asyncio.run(main())

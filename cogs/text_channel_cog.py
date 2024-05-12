@@ -2,15 +2,19 @@ import discord
 import uuid
 import traceback
 import asyncio
+from .redis_cog import RedisCog
 from datetime import datetime, time
 from discord.ext import commands
 from typing import Optional, Dict, Any
 from components.text_channel_view import EmbedChatView, ChannelSetupView, ClearHistoryConfirmView
+from catch.text_channel_catch import TextChannelCache
 from components import operations
 
 class TextChannelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.redis_cog = bot.get_cog('RedisCog')
+        self.cache = TextChannelCache(self.redis_cog)
         self.EMBED_COLOR: int = 0xedff94
 
     class ConfigureSetupOperation:
@@ -71,120 +75,232 @@ class TextChannelCog(commands.Cog):
         return next((prompt['content'] for prompt in self.bot.prompt['prompts'] if prompt['name'] == channel_config['prompt']), self.bot.prompt['default'])
 
     async def send_response(self, message: discord.Message, response: str, user_id: int):
-        """
-        將機器人的回應發送到指定的頻道。
+        embed = discord.Embed(title="聊天對話", color=self.EMBED_COLOR)
+        embed.add_field(name=message.author.display_name, value=message.content, inline=False)
 
-        :param message: 觸發回應的原始訊息。
-        :param response: 要發送的回應內容。
-        :param user_id: 觸發回應的使用者ID。
-        """
-        embed = discord.Embed(title="聊天對話", description="", color=self.EMBED_COLOR)
-        embed.add_field(name=f"{message.author.display_name}", value=message.content, inline=False)
-
-        response_chunks = [response[i:i+1000] for i in range(0, len(response), 1000)]
-
+        response_chunks = [response[i:i + 1000] for i in range(0, len(response), 1000)]
+        bot_name = message.guild.me.display_name
         for i, chunk in enumerate(response_chunks):
-            field_name = f"{message.guild.me.display_name}" if i == 0 else f"回應內容 (Part {i+1})"
+            field_name = bot_name if i == 0 else f"回應內容 (Part {i + 1})"
             embed.add_field(name=field_name, value=chunk, inline=False)
 
-        unique_id: str = str(uuid.uuid4())
-        embed.set_footer(text=f"EmbedChat_ID:{unique_id}/UserID:{user_id}")
-        
-        # 移除該用戶之前的所有 embed 訊息按鈕
-        async for prev_msg in message.channel.history(limit=10): # 上限10則訊息,不然太高會被Discord API速率限制
+        embed.set_footer(text=f"MessageID:{message.id}/UserID:{user_id}")
+
+        try:
+            await self.handle_previous_embeds(message, user_id)
+
+            view = EmbedChatView(user_id)
+            sent_message = await message.reply(embed=embed, view=view)
+            view.message = sent_message
+            await self.cache.update_latest_message_id(str(message.guild.id), str(message.channel.id), user_id, sent_message.id)
+
+        except Exception as e:
+            print(f"處理訊息時發生錯誤: {str(e)}")
+
+    async def handle_previous_embeds(self, message, user_id):
+        latest_message_id = await self.cache.get_latest_message_id(str(message.guild.id), str(message.channel.id), user_id)
+        if latest_message_id:
+            try:
+                latest_embed_message = await message.channel.fetch_message(latest_message_id)
+                
+                if self.is_target_message(latest_embed_message, user_id):
+                    await self.remove_and_cache_button(latest_embed_message)
+                    
+                found_target = False
+                async for prev_msg in message.channel.history(limit=5, before=latest_embed_message):
+                    if self.is_target_message(prev_msg, user_id):
+                        found_target = True
+                        await self.remove_and_cache_button(prev_msg)
+            except discord.NotFound:
+                await self.cache.delete_latest_message_id(str(message.guild.id), str(message.channel.id), user_id)
+        else:
+            found_target = False
+            async for prev_msg in message.channel.history(limit=5):
+                if self.is_target_message(prev_msg, user_id):
+                    found_target = True
+                    await self.remove_and_cache_button(prev_msg)
+                    await self.cache.update_latest_message_id(str(message.guild.id), str(message.channel.id), user_id, prev_msg.id)
+                    break
+
+    def is_target_message(self, msg, user_id):
+        is_bot_author = msg.author == self.bot.user
+        has_embed = msg.embeds
+        has_footer = msg.embeds[0].footer if has_embed else False
+        footer_parts = msg.embeds[0].footer.text.split("/") if has_footer else []
+        has_user_id = len(footer_parts) == 2 and footer_parts[1] == f"UserID:{user_id}"
+
+        return is_bot_author and has_embed and has_footer and has_user_id
+    
+    async def remove_previous_buttons(self, message: discord.Message, user_id: int):
+        async for prev_msg in message.channel.history(limit=5):
             if prev_msg.author == self.bot.user and prev_msg.embeds:
-                prev_embed: discord.Embed = prev_msg.embeds[0] 
-                if prev_embed.footer:
-                    footer_parts: list[str] = prev_embed.footer.text.split("/")
-                    if len(footer_parts) == 2 and footer_parts[1] == f"UserID:{user_id}":
-                        await prev_msg.edit(view=None)
-                else:
-                    print(f"發現没有預期 footer 的 embed 訊息: {prev_msg.id}")
-        
-        view = EmbedChatView(user_id, unique_id)
-        embed_chat_message: discord.Message = await message.reply(embed=embed, view=view)
-        view.message = embed_chat_message
+                if prev_msg.embeds[0].footer and f"UserID:{user_id}" in prev_msg.embeds[0].footer.text:
+                    await prev_msg.edit(view=None)
+            else:
+                print(f"非目標訊息，消息ID: {prev_msg.id}")
+
+    async def remove_and_cache_button(self, msg):
+        cache_key = f"removed_button:{msg.id}"
+        if not await self.redis_cog.redis_exists(cache_key):
+            try:
+                await msg.edit(view=None)
+                print(f"Removed button for message {msg.id}")
+            except Exception as e:
+                print(f"移除按鈕時發生錯誤: {str(e)}")
+                return
+            await self.redis_cog.redis_set(cache_key, "1", ex=86400)
+            print(f"Cached removed button for message {msg.id}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.guild is None or message.author == self.bot.user:
+        if not await self.should_process_message(message):
             return
 
-        if await self.is_bot_mentioned(message):
-            guild_id: str = str(message.guild.id)
-            channel_id: str = str(message.channel.id)
-            channel_config, api_cog = await self.get_channel_config_and_cog(guild_id, channel_id)
-
-            if channel_config and api_cog:
-                prompt_content: str = await self.get_prompt_content(channel_config)
-                api_response: Optional[Dict[str, Any]] = await api_cog.process_message(message, channel_config['api'], channel_config['module'], prompt_content)
-                
-                if api_response and "response" in api_response:
-                    response: str = api_response["response"]
-                    await self.send_response(message, response, message.author.id)
-                else:
-                    await message.channel.send("對不起,我無法處理您的請求。")
-            else:
+        try:
+            channel_config, api_cog = await self.get_channel_config_and_cog(str(message.guild.id), str(message.channel.id))
+            if not channel_config or not api_cog:
                 await message.channel.send("該頻道未設定機器人。")
+                return
 
-    async def find_original_message(self, channel: discord.TextChannel, unique_id: str, user_id: int) -> Optional[discord.Message]:
-        async for msg in channel.history(limit=10):
-            if msg.author == self.bot.user and msg.embeds and msg.embeds[0].footer.text == f"EmbedChat_ID:{unique_id}/UserID:{user_id}":
-                return msg
+            prompt_content = await self.get_prompt_content(channel_config)
+            api_response = await self.process_message_with_api(message, api_cog, channel_config, prompt_content)
+            if api_response:
+                await self.send_response(message, api_response["response"], message.author.id)
+            else:
+                await message.channel.send("對不起,我無法處理您的請求。")
+        except Exception as e:
+            await self.handle_message_error(message, e)
+
+    async def should_process_message(self, message: discord.Message) -> bool:
+        return message.author != self.bot.user and message.guild and await self.is_bot_mentioned(message)
+
+    async def process_message_with_api(self, message: discord.Message, api_cog, channel_config, prompt_content):
+        api_response = await api_cog.process_message(message, channel_config['api'], channel_config['module'], prompt_content)
+        return api_response if api_response and "response" in api_response else None
+
+    async def handle_message_error(self, message: discord.Message, error: Exception):
+        print(f"處理訊息時發生錯誤: {str(error)}")
+        await message.channel.send("處理您的請求時發生錯誤,請稍後再試。")
+
+    async def find_original_message(self, channel: discord.TextChannel, message_id: int, user_id: int) -> Optional[discord.Message]:
+        try:
+            message = await channel.fetch_message(message_id)
+            if self.is_valid_message(message, user_id):
+                return message
+        except discord.NotFound:
+            print(f"無法找到用戶 {user_id} 在頻道 {channel.id} 的訊息 {message_id}")
+        except Exception as e:
+            print(f"在查找訊息 {message_id} 時發生未預期的錯誤: {e}")
+        
+        # 如果通過 message_id 找不到訊息,則回退到遍歷頻道歷史記錄的方式
+        async for message in channel.history(limit=5): # 上限建議5則訊息，太高容易被discord api警告
+            if self.is_valid_message(message, user_id):
+                return message
         return None
+
+    def is_valid_message(self, message: discord.Message, user_id: int) -> bool:
+        return (
+            message.author == message.guild.me and
+            message.embeds and
+            message.embeds[0].footer and
+            f"UserID:{user_id}" in message.embeds[0].footer.text
+        )
+
+    async def search_message_in_history(self, channel, user_id):
+        async for message in channel.history(limit=5): # 上限建議5則訊息，太高容易被discord api警告
+            if message.author == self.bot.user and message.embeds:
+                embed = message.embeds[0]
+                if embed.footer and f"UserID:{user_id}" in embed.footer.text:
+                    return message
     
     async def regenerate_response(self, message: discord.Message, channel_id: str, user_id: int) -> bool:
-        guild_id: str = str(message.guild.id)
-        channel_config, api_cog = await self.get_channel_config_and_cog(guild_id, channel_id)
-
-        if channel_config and api_cog:
-            user_history: list[Dict[str, Any]] = api_cog.chat_history.get(channel_id, {}).get(user_id, {}).get("messages", [])
-
-            if len(user_history) >= 2:
-                last_user_message: Dict[str, Any] = user_history[-2]
-
-                if last_user_message['role'] in ['USER', 'user']:
-                    user_history = user_history[:-2]
-                    full_message: discord.Message = await message.channel.fetch_message(message.id)
-                    
-                    # 根據不同的 Cog,設置 full_message.content 為正確的值
-                    # 這樣可以確保在重新生成回應時,使用的是正確的使用者訊息
-                    if channel_config['cog'] == 'CohereChatCog':
-                        full_message.content = last_user_message['message']
-                    else:
-                        full_message.content = last_user_message['content']
-
-                    api_response: Optional[Dict[str, Any]] = await api_cog.process_message(full_message, channel_config['api'], channel_config['module'], channel_config['prompt'], chat_history=user_history)
-                    return await self.update_response(message, channel_id, user_id, api_cog, api_response, user_history)
-        
-        return False
-
-
-    async def update_response(self, message: discord.Message, channel_id: str, user_id: str, api_cog: commands.Cog, api_response: Optional[Dict[str, Any]], user_history: list[Dict[str, Any]]) -> bool:
         try:
-            if api_response and "response" in api_response:
-                response: str = api_response["response"]
-                footer_info: list[str] = message.embeds[0].footer.text.split("/")
-                unique_id: str = footer_info[0].split("EmbedChat_ID:")[1]
-                user_id: int = int(footer_info[1].split("UserID:")[1])
+            guild_id = str(message.guild.id)
+            channel_config, api_cog = await self.get_channel_config_and_cog(guild_id, channel_id)
+            if not channel_config or not api_cog:
+                return False
 
-                last_embed_message: Optional[discord.Message] = await self.find_original_message(message.channel, unique_id, user_id)
+            user_history = api_cog.chat_history.get(channel_id, {}).get(user_id, {}).get("messages", [])
+            if len(user_history) < 2:
+                return False
 
-                if last_embed_message:
-                    embed: discord.Embed = last_embed_message.embeds[0]
-                    embed.set_field_at(1, name=embed.fields[1].name, value=response, inline=False)
-                    await last_embed_message.edit(embed=embed)
-                    
-                    # 更新 chat_history
-                    api_cog.chat_history[channel_id][str(user_id)]["messages"] = user_history
+            last_user_message = user_history[-2]
+            if last_user_message['role'].lower() != 'user':
+                return False
 
-                    return True
-                else:
-                    await message.channel.send("找不到原始訊息,重新生成失敗。")
+            # 修改原始訊息內容,依據所使用的cog類型而定
+            updated_message_content = await self.modify_message_content(message, last_user_message, channel_config)
+
+            # 處理訊息,包含更新後的內容與使用者歷史紀錄
+            api_response = await api_cog.process_message(updated_message_content, channel_config['api'], channel_config['module'], channel_config['prompt'], chat_history=user_history[:-2])
+            if not api_response:
+                return False
+
+            # 如果處理成功,則更新回應和快取資訊
+            if await self.update_response(message, channel_id, user_id, api_cog, api_response, user_history, channel_config):
+                await self.cache.update_latest_message_id(guild_id, channel_id, user_id, message.id)
+                return True
+            return False
         except Exception as e:
-            print(f"update_response 發生異常: {str(e)}")
-            traceback.print_exc()
-        return False
+            print(f"重新生成回應時發生錯誤: {str(e)}")
+            return False
+
+    async def modify_message_content(self, message, last_user_message, channel_config):
+        full_message = await message.channel.fetch_message(message.id)
+        message_key = 'message' if channel_config['cog'] == 'CohereChatCog' else 'content'
+        full_message.content = last_user_message[message_key]
+        return full_message
+
+    async def update_response(self, message: discord.Message, channel_id: str, user_id: str, api_cog: commands.Cog,
+                              api_response: Optional[Dict[str, Any]], user_history: list[Dict[str, Any]],
+                              channel_config: Dict[str, Any]) -> bool:
+        if not api_response or "response" not in api_response:
+            return False
+
+        response = api_response["response"]
+        last_embed_message = await self._get_last_embed_message(message, channel_id, user_id)
+        if not last_embed_message:
+            return False
+
+        await self._update_embed_message(last_embed_message, response)
+
+        latest_response = self._create_latest_response(response, channel_config)
+        self._update_user_history(user_history, latest_response, channel_config)
+
+        api_cog.chat_history[channel_id][str(user_id)]["messages"] = user_history
+        return True
+
+    async def _get_last_embed_message(self, message: discord.Message, channel_id: str, user_id: int) -> Optional[discord.Message]:
+        latest_message_id = await self.cache.get_latest_message_id(str(message.guild.id), channel_id, int(user_id))
+        if latest_message_id:
+            try:
+                return await message.channel.fetch_message(latest_message_id)
+            except discord.NotFound:
+                print(f"無法找到用戶 {user_id} 在頻道 {channel_id} 的訊息 {latest_message_id}")
+        else:
+            print(f"快取中沒有用戶 {user_id} 在頻道 {channel_id} 的最新 Embed 訊息 ID,回退到遍歷頻道歷史記錄")
+            return await self.search_message_in_history(message.channel, user_id)
+
+    async def _update_embed_message(self, last_embed_message: discord.Message, response: str) -> None:
+        if not last_embed_message.embeds:
+            raise ValueError("last_embed_message 沒有 embed")
+
+        embed = last_embed_message.embeds[0]
+        embed.set_field_at(1, name=embed.fields[1].name, value=response, inline=False)
+        await last_embed_message.edit(embed=embed)
+
+    def _create_latest_response(self, response: str, channel_config: Dict[str, Any]) -> Dict[str, str]:
+        if channel_config['cog'] == 'CohereChatCog':
+            return {"role": "CHATBOT", "message": response}
+        else:
+            return {"role": "assistant", "content": response}
+
+    def _update_user_history(self, user_history: list[Dict[str, Any]], latest_response: Dict[str, str], channel_config: Dict[str, Any]) -> None:
+        assistant_role = "CHATBOT" if channel_config['cog'] == 'CohereChatCog' else "assistant"
+        if user_history and user_history[-1]["role"].lower() == assistant_role.lower():
+            user_history[-1] = latest_response
+        else:
+            user_history.append(latest_response)
     
     @discord.app_commands.command(name="clear_history", description="清理歷史訊息")
     async def clear_history(self, interaction: discord.Interaction):
