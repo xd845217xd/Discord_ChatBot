@@ -56,7 +56,7 @@ DiscordBot/
 - 管理 AI 模型的對話記錄
 - 提供手動清除所有對話記錄的指令
 
-此 cog 引入了 Redis 緩存機制來優化 Embed 訊息按鈕的管理,並統一使用 Discord 提供的 `message.id` 作為 Embed 訊息的唯一標識符。它的核心功能包括處理用戶訊息、生成回應、更新 Embed 訊息和對話歷史等。
+此 cog 引入了 Redis 快取機制來優化 Embed 訊息按鈕的管理,並統一使用 Discord 提供的 `message.id` 作為 Embed 訊息的唯一標識符。它的核心功能包括處理用戶訊息、生成回應、更新 Embed 訊息和對話歷史等。
 
 此 cog 依賴於以下設定檔案和模組:
 
@@ -64,7 +64,7 @@ DiscordBot/
 - `channel_setup_config.json`: 儲存頻道與 AI 模型的對應關係
 - `discord.py`: Discord API 的 Python 庫
 - `redis`: Redis 數據庫的 Python 庫
-- `text_channel_cache.py`: 提供 Redis 緩存操作的類
+- `text_channel_cache.py`: 提供 Redis 快取操作的類
 - `operations.py`: 提供某些操作(如清除對話記錄)的類
 
 此 cog 使用了以下 view 檔案:
@@ -99,7 +99,7 @@ DiscordBot/
 - 從集合中移除值
 - 檢查值是否在集合中
 
-其他的 cog,如 `text_channel_cog.py`,可以導入 `redis_cog.py` 並使用其提供的方法來與 Redis 進行交互,實現數據的緩存和持久化。
+其他的 cog,如 `text_channel_cog.py`,可以導入 `redis_cog.py` 並使用其提供的方法來與 Redis 進行交互,實現數據的快取和持久化。
 
 此 cog 使用了以下環境變量:
 
