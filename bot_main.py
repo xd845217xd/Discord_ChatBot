@@ -10,8 +10,9 @@ from discord import app_commands
 from components.cog_control_view import CogControlView
 from components.clear_confirm_view import ClearConfirmView
 from dotenv import load_dotenv
+import traceback
+import atexit
 
-# 從 .env 檔案載入環境設定檔,例如Discord機器人的Token
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(name)s: %(message)s')
@@ -19,7 +20,6 @@ logger = logging.getLogger('discord')
 
 discord_token = os.getenv('DISCORD_TOKEN')
 
-# 載入設定檔,例如JSON格式的配置文件
 class Bot(commands.Bot):
     def __init__(self, command_prefix, intents):
         super().__init__(command_prefix, intents=intents)
@@ -40,6 +40,8 @@ class Bot(commands.Bot):
             },
             'scheduled_tasks': {}
         }
+        self.client_sessions = []
+        self.client_sessions_closed = False
         self.load_all_configs()
 
     def load_all_configs(self):
@@ -67,34 +69,40 @@ class Bot(commands.Bot):
             print(f"Error saving {file_path}: {str(e)}")
 
     async def setup_hook(self):
-        # 加載 cogs 或其他啟動設定
         await load_extensions("cogs")
         await load_extensions("llms")
-
-        # 同步斜線命令
         await self.tree.sync()
         print("已同步斜線命令。")
-
-        # 打印已加載的模組、Cog和斜線命令
         print(f'{self.user.name} 已經連接到 Discord!', flush=True)
         print("已載入的模組:", self.extensions.keys(), flush=True)
         print("已加載的 Cog:", [cog_name for cog_name in self.cogs], flush=True)
         print("已加載的斜線命令:", [cmd.name for cmd in self.tree.get_commands()])
-    
+
+    async def close_client_sessions(self):
+        if not self.client_sessions_closed:
+            print("正在關閉 aiohttp ClientSessions...")
+            for session in self.client_sessions:
+                await session.close()
+                await session.connector.close()
+            print("所有 aiohttp ClientSessions 已關閉。")
+            self.client_sessions_closed = True
+
+    async def on_disconnect(self):
+        if not self.is_closed():
+            print("Bot 已斷開連接,正在關閉 aiohttp ClientSessions...")
+            await self.close_client_sessions()
+
     async def close(self):
+        await self.close_client_sessions()
         print("正在關閉 Redis 連接...")
         if hasattr(self, 'redis_cog') and self.redis_cog.redis_client:
             await self.redis_cog.redis_close()
         print("Redis 連接已關閉。")
-        await super().close()  # 確保調用父類的 close 方法來處理其他清理工作
+        await super().close()
 
-# 初始化 Intents
 intents = discord.Intents.all()
-
-# 建立一個 commands.Bot 實例
 bot = Bot(command_prefix='!', intents=intents)
 
-# 定義斜線命令
 @bot.tree.command(name="load", description="載入模組")
 async def load_cog(interaction: discord.Interaction):
     view = CogControlView(bot, title="load")
@@ -117,10 +125,7 @@ async def test_command(interaction: discord.Interaction):
 @bot.tree.command(name="clear_channel", description="清除指定頻道的對話紀錄")
 @app_commands.describe(channel="選擇要清除的頻道")
 async def clear_channel(interaction: discord.Interaction, channel: discord.TextChannel):
-    # 創建確認視圖
     view = ClearConfirmView(bot, interaction, channel)
-
-    # 發送確認訊息
     view.message = await interaction.response.send_message(
         f"您確定要清除頻道 {channel.mention} 的對話紀錄嗎?",
         view=view,
@@ -129,32 +134,41 @@ async def clear_channel(interaction: discord.Interaction, channel: discord.TextC
 
 @bot.tree.command(name='show_mapping', description='顯示目前的 cog 映射表')
 async def show_mapping(interaction: discord.Interaction):
-    # 發送暫時回應
     await interaction.response.defer()
-
-    # 生成映射表的字符串表示
     mapping = "\n".join(f"{key}: {value}" for key, value in interaction.client.cogs_config['cogs_mapping'].items())
-    
-    # 發送最終回應
     await interaction.followup.send(f"目前的 cog 映射表：\n{mapping}")
 
-# 自動載入 cogs跟llms 目錄下的所有擴展
 async def load_extensions(directory):
     for filename in os.listdir(f"./{directory}"):
         if filename.endswith(".py"):
             await bot.load_extension(f"{directory}.{filename[:-3]}")
 
 def handle_shutdown_signal():
-    print("收到終止信號，正在關閉 bot...")
-    asyncio.create_task(bot.close())
+    print("收到終止信號,正在關閉 bot...")
+    if not bot.is_closed():
+        asyncio.create_task(bot.close())
+
+def resource_warning(loop, context):
+    print(f"未關閉的資源警告: {context}")
+    traceback.print_stack()
+
+async def close_sessions():
+    if not bot.is_closed():
+        print("程序退出,正在關閉 aiohttp ClientSessions...")
+        await bot.close_client_sessions()
+
+atexit.register(lambda: asyncio.run(close_sessions()))
 
 async def main():
+    asyncio.get_event_loop().set_exception_handler(resource_warning)
     try:
         await bot.start(discord_token)
     except KeyboardInterrupt:
-        print('收到 Ctrl+C，正在關閉 bot...')
+        print('收到 Ctrl+C,正在關閉 bot...')
     finally:
-        await bot.close()
+        if not bot.is_closed():
+            await bot.close()
+        await asyncio.sleep(1)
         print('Bot 已安全關閉。')
 
 if __name__ == '__main__':
