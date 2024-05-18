@@ -7,7 +7,7 @@ from datetime import datetime, time
 from discord.ext import commands
 from typing import Optional, Dict, Any
 from components.text_channel_view import EmbedChatView, ChannelSetupView, ClearHistoryConfirmView
-from catch.text_channel_catch import TextChannelCache
+from cache.text_channel_cache import TextChannelCache
 from components import operations
 
 class TextChannelCog(commands.Cog):
